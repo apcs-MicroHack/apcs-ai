@@ -42,6 +42,12 @@ async def lifespan(app: FastAPI):
 app = FastAPI(title="Microhack Agentic AI API", lifespan=lifespan)
 
 
+@app.get("/health")
+def health_check():
+    """Health check endpoint for Docker healthcheck"""
+    return {"status": "healthy", "service": "AI"}
+
+
 def _require_api_key(x_api_key: Optional[str]) -> None:
     expected = os.getenv("AGENT_API_KEY", "").strip()
     if not expected:
