@@ -1,0 +1,73 @@
+version: "3.8"
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: microhack_postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: 123456789
+      POSTGRES_DB: microhack_checkpoints
+    ports:
+      - "0.0.0.0:5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d microhack_checkpoints"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  pgadmin:
+    image: dpage/pgadmin4:latest
+    container_name: microhack_pgadmin
+    restart: unless-stopped
+    environment:
+      PGADMIN_DEFAULT_EMAIL: admin@microhack.com
+      PGADMIN_DEFAULT_PASSWORD: admin123
+    ports:
+      - "0.0.0.0:8890:80"
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: microhack_api
+    restart: unless-stopped
+    ports:
+      - "0.0.0.0:8080:8080"
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    deploy:
+      resources:
+        limits:
+          cpus: "4"
+          memory: 4G
+        reservations:
+          cpus: "2"
+          memory: 2G
+    environment:
+      # PostgreSQL — uses Docker service name "postgres" as host
+      CHECKPOINT_DB_URL: postgresql://postgres:123456789@postgres:5432/microhack_checkpoints
+      # Backend API — use host.docker.internal if backend runs on host machine
+      API_BASE_URL: ${API_BASE_URL}
+      # Auth credentials for auto-login to the backend
+      ADMIN_EMAIL: ${ADMIN_EMAIL:-admin@apcs-port.dz}
+      ADMIN_PASSWORD: ${ADMIN_PASSWORD:-Admin@APCS2026!}
+      # Pass through from host .env
+      MISTRAL_API_KEY: ${MISTRAL_API_KEY}
+      LANGSMITH_API_KEY: ${LANGSMITH_API_KEY}
+      LANGSMITH_TRACING: ${LANGSMITH_TRACING:-true}
+      LANGSMITH_PROJECT: ${LANGSMITH_PROJECT:-microhack_3}
+      LANGSMITH_ENDPOINT: ${LANGSMITH_ENDPOINT:-https://eu.api.smith.langchain.com}
+      AGENT_API_KEY: ${AGENT_API_KEY}
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+volumes:
+  pgdata:
